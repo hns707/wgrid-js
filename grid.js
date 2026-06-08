@@ -1,4 +1,4 @@
-let gridSize = [100, 100];
+let gridSize = [20, 20];
 let gridInfo = [];
 let gContain = document.getElementById("grid-container");
 document.documentElement.style.setProperty('--grid-size', gridSize[0]);
@@ -13,6 +13,12 @@ const waterLevel = 0;
 const waterMaxExpand = waterLevel + 2;
 const waterSquaredBrush = true;
 const isArchipelago = false;
+
+//User
+let hvSwapping = false;
+let currentHvShape = 0;
+const hvShape = ["single", "adj", "adj-square", "lg-adj", "lg-adj-square"];
+let currentHoveredCell = [-1, -1];
 
 
 class Cell {
@@ -43,7 +49,55 @@ function main() {
     createWater();
     updateAllCellsClasses();
 
+    document.addEventListener("keypress", (event) => {
+        let keyName = (event.key).toUpperCase();
+
+        if (keyName === "A") {
+            swapHvShape();
+            console.log("Changed hvShape to " + hvShape[currentHvShape]);
+
+        }
+    })
+
 }
+
+function swapHvShape() {
+    hvSwapping = true;
+    let elems = document.querySelectorAll(".selected");
+    elems.forEach.call(elems, function (el) {
+        el.classList.remove("selected");
+    });
+    if (currentHvShape >= hvShape.length - 1) { currentHvShape = 0 } else { currentHvShape++; }
+    if (currentHoveredCell[0] != -1) { hoverCell(currentHoveredCell[0], currentHoveredCell[1], document.getElementById("cell-" + currentHoveredCell[0] + "-" + currentHoveredCell[1]),0,7); }
+}
+
+function hoverCell(x, y, targetCell, minHeight = -99, maxHeight = 99) {
+    
+    targetCell.classList.toggle("selected");
+    if (hvShape[currentHvShape] !== "single") {
+        getHoverShape(x, y, hvShape[currentHvShape]).forEach(element => {
+            if (gridInfo[element[0]][element[1]][1].height < maxHeight && gridInfo[element[0]][element[1]][1].height > minHeight) {
+                document.getElementById("cell-" + element[0] + "-" + element[1]).classList.toggle("selected");
+            }
+        })
+    }
+}
+
+function getHoverShape(x, y, shape) {
+    switch (shape) {
+        case "adj":
+            return getAdjacentCells(x, y, false);
+        case "adj-square":
+            return getAdjacentCells(x, y, true);
+        case "lg-adj":
+            return getAdjacentCells(x, y, false, 1, 3);
+        case "lg-adj-square":
+            return getAdjacentCells(x, y, true, 1, 3);
+        default:
+            return -1;
+    }
+}
+
 
 function adjustAllHeights(nb) {
     for (let i = nb; i > 0; i--) {
@@ -67,7 +121,14 @@ function generateGrid(params) {
             if (wall) { newCell.classList.toggle("wall"); }
             newCell.addEventListener("click", (e) => {
                 console.log(gridInfo[i][j][1]);
-                newCell.classList.toggle("selected");
+            })
+            newCell.addEventListener("mouseover", (e) => {
+                currentHoveredCell = [i, j];
+                hoverCell(i, j, newCell, 0, 7);
+            })
+            newCell.addEventListener("mouseout", (e) => {
+                currentHoveredCell = [-1, -1];
+                hoverCell(i, j, newCell, 0, 7)
             })
             //newCell.innerHTML = wall ? "W" : "/";
             gContain.appendChild(newCell);
@@ -152,22 +213,30 @@ function expandLands(probability, maxHeight) {
 }
 
 
-function getAdjacentCells(x, y, squareBrush) {
+function getAdjacentCells(x, y, squareBrush, start = 1, size = 1) {
     let adj = [];
 
-    if (x + 1 < gridSize[0]) { adj.push([x + 1, y]) }
-    if (x - 1 >= 0) { adj.push([x - 1, y]) }
-    if (y + 1 < gridSize[1]) { adj.push([x, y + 1]) }
-    if (y - 1 >= 0) { adj.push([x, y - 1]) }
+    for (let i = start; i < size + 1; i++) {
+        if (x + i < gridSize[0]) { adj.push([x + i, y]) }
+        if (x - i >= 0) { adj.push([x - i, y]) }
+        if (y + i < gridSize[1]) { adj.push([x, y + i]) }
+        if (y - 1 >= 0) { adj.push([x, y - i]) }
 
-    if (squareBrush) {
-        if (x + 1 < gridSize[0] && y + 1 < gridSize[1]) { adj.push([x + 1, y + 1]) }
-        if (x - 1 >= 0 && y - 1 >= 0) { adj.push([x - 1, y - 1]) }
-        if (x + 1 < gridSize[0] && y - 1 >= 0) { adj.push([x + 1, y - 1]) }
-        if (x - 1 >= 0 && y + 1 < gridSize[1]) { adj.push([x - 1, y + 1]) }
+        if (squareBrush) {
+            if (x + i < gridSize[0] && y + i < gridSize[1]) { adj.push([x + i, y + i]) }
+            if (x - i >= 0 && y - 1 >= 0) { adj.push([x - i, y - i]) }
+            if (x + i < gridSize[0] && y - i >= 0) { adj.push([x + i, y - i]) }
+            if (x - i >= 0 && y + 1 < gridSize[1]) { adj.push([x - i, y + i]) }
+        }
     }
 
+
     return adj;
+}
+
+function getCircleCells(x,y,r) {
+    let circle = [];
+    
 }
 
 function editCellHeight(x, y, z) {
@@ -198,7 +267,7 @@ function updateAllCellsClasses() {
                 c.classList.add("sand");
             } else {
                 if (c) {
-                    let level = z > 6 && !isArchipelago ? z : z-waterLevel;
+                    let level = z > 6 && !isArchipelago ? z : z - waterLevel;
                     c.classList.add("wl-" + level);
                 }
             }
