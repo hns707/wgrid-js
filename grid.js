@@ -1,4 +1,4 @@
-let gridSize = [20, 20];
+let gridSize = [50, 50];
 let gridInfo = [];
 let gContain = document.getElementById("grid-container");
 document.documentElement.style.setProperty('--grid-size', gridSize[0]);
@@ -16,8 +16,11 @@ const isArchipelago = false;
 
 //User
 let hvSwapping = false;
+let currentHvShapeSize = 1;
+const hvMaxSize = 8;
 let currentHvShape = 0;
-const hvShape = ["single", "adj", "adj-square", "lg-adj", "lg-adj-square"];
+let hvOutline = false;
+const hvShape = ["single", "cross", "star", "circle", "square"];
 let currentHoveredCell = [-1, -1];
 
 
@@ -48,6 +51,7 @@ function main() {
 
     createWater();
     updateAllCellsClasses();
+    updateHtmlInfos();
 
     document.addEventListener("keypress", (event) => {
         let keyName = (event.key).toUpperCase();
@@ -55,7 +59,11 @@ function main() {
         if (keyName === "A") {
             swapHvShape();
             console.log("Changed hvShape to " + hvShape[currentHvShape]);
-
+        } else if (keyName === "Z") {
+            changeHvSize();
+            console.log("Changed currentHvShapeSize to " + currentHvShapeSize);
+        } else if (keyName === "E") {
+            changeHvOutline();
         }
     })
 
@@ -63,36 +71,55 @@ function main() {
 
 function swapHvShape() {
     hvSwapping = true;
+    if (currentHvShape >= hvShape.length - 1) { currentHvShape = 0 } else { currentHvShape++; }
+    refreshCellsSelection();
+    updateHtmlInfos();
+}
+
+function changeHvSize() {
+    currentHvShapeSize = currentHvShapeSize >= hvMaxSize ? 0 : currentHvShapeSize + 1;
+    refreshCellsSelection();
+    updateHtmlInfos();
+}
+
+function changeHvOutline() {
+    hvOutline = !hvOutline;
+    refreshCellsSelection();
+    updateHtmlInfos();
+}
+
+function refreshCellsSelection() {
     let elems = document.querySelectorAll(".selected");
     elems.forEach.call(elems, function (el) {
         el.classList.remove("selected");
     });
-    if (currentHvShape >= hvShape.length - 1) { currentHvShape = 0 } else { currentHvShape++; }
-    if (currentHoveredCell[0] != -1) { hoverCell(currentHoveredCell[0], currentHoveredCell[1], document.getElementById("cell-" + currentHoveredCell[0] + "-" + currentHoveredCell[1]),0,7); }
+    if (currentHoveredCell[0] != -1) { hoverCell(currentHoveredCell[0], currentHoveredCell[1], document.getElementById("cell-" + currentHoveredCell[0] + "-" + currentHoveredCell[1]), 0, 7); }
 }
 
 function hoverCell(x, y, targetCell, minHeight = -99, maxHeight = 99) {
-    
-    targetCell.classList.toggle("selected");
+
+
     if (hvShape[currentHvShape] !== "single") {
         getHoverShape(x, y, hvShape[currentHvShape]).forEach(element => {
             if (gridInfo[element[0]][element[1]][1].height < maxHeight && gridInfo[element[0]][element[1]][1].height > minHeight) {
                 document.getElementById("cell-" + element[0] + "-" + element[1]).classList.toggle("selected");
             }
         })
+    } else {
+        targetCell.classList.toggle("selected");
     }
 }
 
 function getHoverShape(x, y, shape) {
     switch (shape) {
-        case "adj":
-            return getAdjacentCells(x, y, false);
-        case "adj-square":
-            return getAdjacentCells(x, y, true);
-        case "lg-adj":
-            return getAdjacentCells(x, y, false, 1, 3);
-        case "lg-adj-square":
-            return getAdjacentCells(x, y, true, 1, 3);
+        case "cross":
+            return getAdjacentCells(x, y, false, 1, currentHvShapeSize);
+        case "star":
+            return getAdjacentCells(x, y, true, 1, currentHvShapeSize);
+        case "circle":
+            return getCirclePixels(x, y, currentHvShapeSize, gridSize, hvOutline);
+        case "square":
+            return getSquarePixels(x, y, currentHvShapeSize, gridSize, hvOutline);
         default:
             return -1;
     }
@@ -107,7 +134,7 @@ function adjustAllHeights(nb) {
 
 
 
-function generateGrid(params) {
+function generateGrid() {
     for (let i = 0; i < gridSize[0]; i++) {
         gridInfo.push([]);
         for (let j = 0; j < gridSize[1]; j++) {
@@ -214,7 +241,7 @@ function expandLands(probability, maxHeight) {
 
 
 function getAdjacentCells(x, y, squareBrush, start = 1, size = 1) {
-    let adj = [];
+    let adj = [[x, y]];
 
     for (let i = start; i < size + 1; i++) {
         if (x + i < gridSize[0]) { adj.push([x + i, y]) }
@@ -234,9 +261,77 @@ function getAdjacentCells(x, y, squareBrush, start = 1, size = 1) {
     return adj;
 }
 
-function getCircleCells(x,y,r) {
+function getCirclePixels(cx, cy, radius, gridSize, outline) {
+    const pixels = [];
+
+    for (let x = cx - radius; x <= cx + radius; x++) {
+        for (let y = cy - radius; y <= cy + radius; y++) {
+
+            if (
+                x >= 0 &&
+                y >= 0 &&
+                x < gridSize[0] &&
+                y < gridSize[1]
+            ) {
+                const distanceSquared =
+                    (x - cx) ** 2 +
+                    (y - cy) ** 2;
+
+                if (outline) {
+                    // Tolérance pour obtenir un contour d'1 pixel
+                    if (
+                        distanceSquared <= radius ** 2 &&
+                        distanceSquared >= (radius - 1) ** 2
+                    ) {
+                        pixels.push([x, y]);
+                    }
+                } else {
+                    if (distanceSquared <= radius ** 2) {
+                        pixels.push([x, y]);
+                    }
+                }
+            }
+        }
+    }
+
+    return pixels;
+}
+
+function getSquarePixels(cx, cy, size, gridSize, outline) {
+    const pixels = [];
+
+    for (let x = cx - size; x <= cx + size; x++) {
+        for (let y = cy - size; y <= cy + size; y++) {
+
+            if (
+                x >= 0 &&
+                y >= 0 &&
+                x < gridSize[0] &&
+                y < gridSize[1]
+            ) {
+                if (outline) {
+                    const isBorder =
+                        x === cx - size ||
+                        x === cx + size ||
+                        y === cy - size ||
+                        y === cy + size;
+
+                    if (isBorder) {
+                        pixels.push([x, y]);
+                    }
+                } else {
+                    pixels.push([x, y]);
+                }
+            }
+        }
+    }
+
+    return pixels;
+}
+
+function getCircleCells(x, y, r) {
     let circle = [];
-    
+
 }
 
 function editCellHeight(x, y, z) {
@@ -253,6 +348,12 @@ function editCellHeight(x, y, z) {
         }
     }
 }
+
+function updateHtmlInfos() {
+    let c = document.getElementById("hvInfo");
+    c.innerHTML = "Current shape : " + hvShape[currentHvShape] + " | Size : " + currentHvShapeSize + " | Outline? : " + hvOutline;
+}
+
 function updateAllCellsClasses() {
     for (let i = 0; i < gridSize[0]; i++) {
         for (let j = 0; j < gridSize[1]; j++) {
