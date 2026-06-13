@@ -69,6 +69,14 @@ function main() {
 
 }
 
+function setStructure(shape,size,outline) {
+    currentHvShape = shape;
+    currentHvShapeSize = size;
+    hvOutline = outline;
+    refreshCellsSelection();
+    updateHtmlInfos();
+}
+
 function swapHvShape() {
     hvSwapping = true;
     if (currentHvShape >= hvShape.length - 1) { currentHvShape = 0 } else { currentHvShape++; }
